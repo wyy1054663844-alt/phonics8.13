@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IPA Trainer — 波形对比 /ə/ /ɚ/ /ɝː/</title>
+<style>
+  :root{--bg:#0b1022;--bg2:#0f172a;--border:#1f2937;--txt:#e5e7eb;--muted:#9ca3af;
+        --primary:#60a5fa;--cyan:#22d3ee;--green:#22c55e;--red:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,var(--bg),var(--bg2) 30%,var(--bg));
+  color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:24px auto;padding:16px}
+  h1{margin:0 0 6px;font-weight:800} .sub{color:var(--muted);margin:0 0 14px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 16px}
+  .pill{display:inline-flex;align-items:center;gap:8px;background:#0b1228;border:1px solid var(--border);
+        padding:8px 10px;border-radius:12px}
+  button{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;color:#041422;background:#2d3648}
+  button.primary{background:var(--primary)} button.secondary{background:var(--cyan)}
+  button.success{background:var(--green);color:#052e16} button.warn{background:var(--red);color:#3a0a0a}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:14px}
+  @media (max-width:980px){.grid{grid-template-columns:1fr}}
+  .card{background:rgba(17,24,39,.75);backdrop-filter:blur(6px);border:1px solid var(--border);
+        border-radius:16px;padding:14px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed var(--border)}
+  .row:first-child{border-top:0} .ipa{font-size:28px;font-weight:800} .desc{color:var(--muted);font-size:13px}
+  .word{display:flex;flex-direction:column} .word small{color:var(--muted)} .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .muted{color:var(--muted)} .chip{border:1px solid var(--border);padding:4px 8px;border-radius:999px;font-size:12px;color:var(--muted)}
+  .scope{display:grid;grid-template-columns:1fr;gap:6px;margin-top:12px}
+  .canvas-wrap{position:relative;background:#0b1228;border:1px solid var(--border);border-radius:10px;padding:8px}
+  canvas{width:100%;height:120px;display:block}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:4px}
+  .blue{background:var(--primary)} .green{background:var(--green)} .pointer{background:#ffffff80;height:100%;width:2px;position:absolute;top:8px}
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>IPA Trainer — 波形对比（/ə/ /ɚ/ /ɝː/）</h1>
+  <p class="sub">选择 <b>Local</b> 可从 <code>audio/</code> 加载原音并绘制波形；<b>TTS</b> 仅播放，无法绘制原音波形（浏览器限制）。</p>
+
+  <div class="toolbar">
+    <span class="pill">Playback Source:
+      <label><input type="radio" name="src" value="tts" checked> TTS</label>
+      <label><input type="radio" name="src" value="local"> Local</label>
+    </span>
+    <span class="pill">Voice: <select id="voice"></select></span>
+    <span class="pill">Rate <input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="0.75">
+      <span id="rateV">0.75</span></span>
+    <span class="pill">Pitch <input id="pitch" type="range" min="0.8" max="1.3" step="0.05" value="1.00">
+      <span id="pitchV">1.00</span></span>
+  </div>
+
+  <!-- 音标与单词 -->
+  <div class="grid" id="wordGrid"></div>
+
+  <!-- 波形对比区 -->
+  <section class="card" style="margin-top:18px">
+    <h3 style="margin:0 0 8px">波形对比（原音 vs 你的录音）</h3>
+    <p class="muted">步骤：先点单词🔊获取原音 → 再点 🎙 录音 → 点击“对比播放”查看两条波形与指针同步。</p>
+    <div class="flex" style="margin:8px 0 12px">
+      <button id="compareBtn" class="secondary" disabled>🔁 对比播放（原音→录音）</button>
+      <button id="resetBtn" class="warn" disabled>🧹 清除波形</button>
+      <span id="status" class="muted"></span>
+    </div>
+    <div class="legend">
+      <span><span class="dot blue"></span>原音波形（Local）</span>
+      <span><span class="dot green"></span>我的录音</span>
+    </div>
+    <div class="scope">
+      <div class="canvas-wrap">
+        <canvas id="refCanvas" width="1000" height="120"></canvas>
+        <div id="refPointer" class="pointer" style="left:-9999px"></div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="micCanvas" width="1000" height="120"></canvas>
+        <div id="micPointer" class="pointer" style="left:-9999px"></div>
+      </div>
+    </div>
+    <audio id="refAudio" class="hidden" controls style="margin-top:8px"></audio>
+    <audio id="micAudio" class="hidden" controls style="margin-top:8px"></audio>
+  </section>
+</div>
+
+<script>
+/* ========= 数据 ========= */
+const WORDS = [
+  {key:'about', ipa:'əˈbaʊt', group:'/ə/'},
+  {key:'banana', ipa:'bəˈnænə', group:'/ə/'},
+  {key:'sofa', ipa:'ˈsoʊfə', group:'/ə/'},
+  {key:'better', ipa:'ˈbet̬ɚ', group:'/ɚ/'},
+  {key:'butter', ipa:'ˈbʌt̬ɚ', group:'/ɚ/'},
+  {key:'teacher', ipa:'ˈtiːtʃɚ', group:'/ɚ/'},
+  {key:'her', ipa:'hɝː', group:'/ɝː/'},
+  {key:'term', ipa:'tɝːm', group:'/ɝː/'},
+  {key:'bird', ipa:'bɝːd', group:'/ɝː/'},
+];
+const GROUPS = ['/ə/','/ɚ/','/ɝː/'];
+
+/* ========= 语音合成（TTS） ========= */
+const synth = window.speechSynthesis;
+let voices = [];
+const voiceSel = document.getElementById('voice');
+const rateEl = document.getElementById('rate'), pitchEl = document.getElementById('pitch');
+const rateV = document.getElementById('rateV'), pitchV = document.getElementById('pitchV');
+function loadVoices(){
+  voices = synth.getVoices().filter(v=>/en/i.test(v.lang));
+  voiceSel.innerHTML='';
+  voices.forEach((v,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i; opt.textContent=`${v.name} — ${v.lang}`;
+    if(/en-US/.test(v.lang) && /Google|Microsoft|Samantha|Natural|Neural/i.test(v.name)) opt.selected=true;
+    voiceSel.appendChild(opt);
+  });
+}
+loadVoices(); if (typeof speechSynthesis!=='undefined'){ speechSynthesis.onvoiceschanged=loadVoices; }
+rateEl.oninput=()=>rateV.textContent=Number(rateEl.value).toFixed(2);
+pitchEl.oninput=()=>pitchV.textContent=Number(pitchEl.value).toFixed(2);
+function speak(text){
+  const u = new SpeechSynthesisUtterance(text);
+  const v = voices[voiceSel.value|0] || voices[0];
+  if (v){ u.voice=v; u.lang=v.lang; } else { u.lang='en-US'; }
+  u.rate=parseFloat(rateEl.value); u.pitch=parseFloat(pitchEl.value);
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+/* ========= 播放源 ========= */
+function mode(){ return document.querySelector('input[name="src"]:checked').value; }
+async function playWord(key){
+  if (mode()==='local'){
+    const src = `audio/${key}.mp3`;
+    refAudio.src = src;
+    await refAudio.play().catch(()=>speak(key));
+    // 预加载并解析以绘制波形
+    try { await loadAndDrawRef(src); status('✅ 已加载原音波形'); } 
+    catch(e){ console.warn(e); status('⚠️ 未能绘制原音波形（找不到音频或 CORS）'); }
+  } else {
+    speak(key);
+    status('TTS 模式无法绘制原音波形（浏览器限制）');
+  }
+}
+
+/* ========= 生成页面（分组） ========= */
+const grid = document.getElementById('wordGrid');
+GROUPS.forEach(g=>{
+  const card = document.createElement('section'); card.className='card';
+  const head = document.createElement('div'); head.className='row';
+  head.innerHTML = `<div><div class="ipa">${g}</div><div class="desc">${g==='\/ə\/'?'Schwa：中央放松。':g==='\/ɚ\/'?'弱读卷舌。':'重读卷舌。'}</div></div>`;
+  card.appendChild(head);
+  WORDS.filter(w=>w.group===g).forEach(w=>{
+    const row = document.createElement('div'); row.className='row';
+    row.innerHTML = `
+      <div class="word"><strong>${w.key}</strong> <small>/${w.ipa}/</small></div>
+      <div class="btns">
+        <button class="primary" data-play="${w.key}">🔊</button>
+        <button class="success" data-rec="${w.key}">🎙 录音</button>
+      </div>
+    `;
+    card.appendChild(row);
+  });
+  grid.appendChild(card);
+});
+grid.addEventListener('click', e=>{
+  const k1 = e.target.getAttribute('data-play');
+  const k2 = e.target.getAttribute('data-rec');
+  if (k1) playWord(k1);
+  if (k2) record2s();
+});
+
+/* ========= 波形绘制 & 对齐 ========= */
+const refCanvas = document.getElementById('refCanvas');
+const micCanvas = document.getElementById('micCanvas');
+const refCtx = refCanvas.getContext('2d');
+const micCtx = micCanvas.getContext('2d');
+const refPointer = document.getElementById('refPointer');
+const micPointer = document.getElementById('micPointer');
+const refAudio = document.getElementById('refAudio');
+const micAudio = document.getElementById('micAudio');
+const compareBtn = document.getElementById('compareBtn');
+const resetBtn = document.getElementById('resetBtn');
+
+let ac; // AudioContext
+let refBuffer=null, micBuffer=null;
+function acEnsure(){ if(!ac) ac = new (window.AudioContext||window.webkitAudioContext)(); return ac; }
+
+function status(msg){ document.getElementById('status').textContent = msg||''; }
+
+function drawWave(canvas, ctx, data, color){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth = 1; ctx.strokeStyle = color; ctx.beginPath();
+  const mid = canvas.height/2;
+  const step = Math.ceil(data.length / canvas.width);
+  for (let x=0; x<canvas.width; x++){
+    const start = x*step;
+    let min=1,max=-1;
+    for(let i=0;i<step && start+i<data.length;i++){
+      const v = data[start+i];
+      if(v<min) min=v; if(v>max) max=v;
+    }
+    ctx.moveTo(x, mid + min*mid);
+    ctx.lineTo(x, mid + max*mid);
+  }
+  ctx.stroke();
+}
+
+async function loadAndDrawRef(url){
+  const ctx = acEnsure();
+  const res = await fetch(url); const arr = await res.arrayBuffer();
+  refBuffer = await ctx.decodeAudioData(arr.slice(0));
+  // 归一化 & 绘制
+  const ch = refBuffer.getChannelData(0);
+  drawWave(refCanvas, refCtx, ch, '#60a5fa');
+  compareBtn.disabled = !(refBuffer && micBuffer);
+  resetBtn.disabled = !(refBuffer || micBuffer);
+}
+
+function drawMicFromBuffer(){
+  if(!micBuffer) return;
+  const ch = micBuffer.getChannelData(0);
+  drawWave(micCanvas, micCtx, ch, '#22c55e');
+  compareBtn.disabled = !(refBuffer && micBuffer);
+  resetBtn.disabled = !(refBuffer || micBuffer);
+}
+
+/* ========= 录音（2 秒，手动回放） ========= */
+let mediaStream, mediaRecorder, chunks=[];
+async function ensureMic(){
+  if (mediaStream) return mediaStream;
+  mediaStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+  return mediaStream;
+}
+async function record2s(){
+  try{
+    await ensureMic(); chunks=[];
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':
+                 MediaRecorder.isTypeSupported('audio/mp4')?'audio/mp4':'';
+    mediaRecorder = new MediaRecorder(mediaStream, mime?{mimeType:mime}:{});
+    status('录音中… 2 秒'); 
+    return new Promise(resolve=>{
+      mediaRecorder.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = async ()=>{
+        status('录音完成'); 
+        const blob = new Blob(chunks, {type: mime || 'audio/webm'});
+        micAudio.src = URL.createObjectURL(blob);
+        // 解码为 AudioBuffer 以绘制波形
+        const arr = await blob.arrayBuffer();
+        const ctx = acEnsure();
+        micBuffer = await ctx.decodeAudioData(arr.slice(0));
+        drawMicFromBuffer();
+        resolve();
+      };
+      mediaRecorder.start(); setTimeout(()=> mediaRecorder.stop(), 2000);
+    });
+  }catch(e){
+    console.error(e); status('❌ 无法录音：请允许麦克风；移动端建议 HTTPS（GitHub Pages）访问。');
+  }
+}
+
+/* ========= 对比播放（原音→录音） + 指针同步 ========= */
+let rafId = null;
+function stopPointers(){ cancelAnimationFrame(rafId); refPointer.style.left='-9999px'; micPointer.style.left='-9999px'; }
+
+function animatePointers(){
+  const start = performance.now();
+  const refDur = refAudio.duration || (refBuffer? refBuffer.duration:0);
+  const micDur = micAudio.duration || (micBuffer? micBuffer.duration:0);
+
+  function frame(){
+    // 原音指针
+    if(!refAudio.paused && refDur>0){
+      const x = (refAudio.currentTime/refDur) * (refCanvas.clientWidth-2);
+      refPointer.style.left = (8 + Math.max(0,Math.min(x, refCanvas.clientWidth-2))) + 'px';
+    } else if (refAudio.paused && refAudio.currentTime===0){ refPointer.style.left='-9999px'; }
+    // 录音指针
+    if(!micAudio.paused && micDur>0){
+      const x2 = (micAudio.currentTime/micDur) * (micCanvas.clientWidth-2);
+      micPointer.style.left = (8 + Math.max(0,Math.min(x2, micCanvas.clientWidth-2))) + 'px';
+    } else if (micAudio.paused && micAudio.currentTime===0){ micPointer.style.left='-9999px'; }
+
+    rafId = requestAnimationFrame(frame);
+  }
+  rafId = requestAnimationFrame(frame);
+}
+
+compareBtn.addEventListener('click', async ()=>{
+  if(!(refBuffer && micBuffer)){ status('请先获取原音波形并完成录音'); return; }
+  stopPointers();
+  // 顺序：原音→1秒间隔→录音
+  try{
+    status('对比播放：原音…'); 
+    refAudio.currentTime=0; await refAudio.play();
+    animatePointers();
+    await new Promise(r=>refAudio.onended=r);
+    stopPointers();
+    status('对比播放：间隔…'); await new Promise(r=>setTimeout(r, 1000));
+    status('对比播放：录音…');
+    micAudio.currentTime=0; await micAudio.play();
+    animatePointers();
+    await new Promise(r=>micAudio.onended=r);
+    stopPointers(); status('✅ 对比完成（可重复点击）');
+  }catch(e){ console.warn(e); stopPointers(); status('⚠️ 无法播放：请检查浏览器自动播放策略或音量'); }
+});
+
+resetBtn.addEventListener('click', ()=>{
+  stopPointers(); refCtx.clearRect(0,0,refCanvas.width,refCanvas.height);
+  micCtx.clearRect(0,0,micCanvas.width,micCanvas.height);
+  refBuffer=null; micBuffer=null; refAudio.removeAttribute('src'); micAudio.removeAttribute('src');
+  compareBtn.disabled=true; resetBtn.disabled=true; status('已清除波形');
+});
+</script>
+</body>
+</html>
