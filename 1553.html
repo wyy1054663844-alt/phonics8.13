@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IPA Trainer — /ə/ /ɚ/ /ɝː/（TTS + 录音存储 + 自动播放）</title>
+<style>
+  :root{--bg:#0b1022;--bg2:#0f172a;--border:#1f2937;--txt:#e5e7eb;--muted:#9ca3af;
+        --primary:#60a5fa;--cyan:#22d3ee;--green:#22c55e;--red:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,var(--bg),var(--bg2) 30%,var(--bg));
+  color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1100px;margin:24px auto;padding:16px}
+  h1{margin:0 0 8px;font-weight:800}
+  .sub{color:var(--muted);margin:0 0 16px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 18px}
+  .pill{display:inline-flex;align-items:center;gap:8px;background:#0b1228;border:1px solid var(--border);
+        padding:8px 10px;border-radius:12px}
+  button{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;color:#041422;background:#2d3648}
+  button.primary{background:var(--primary)}
+  button.secondary{background:var(--cyan)}
+  button.success{background:var(--green);color:#052e16}
+  button.warn{background:var(--red);color:#3a0a0a}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:14px}
+  @media (max-width:1100px){.grid{grid-template-columns:1fr}}
+  .card{background:rgba(17,24,39,.75);backdrop-filter:blur(6px);border:1px solid var(--border);
+        border-radius:16px;padding:14px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px dashed var(--border)}
+  .row:first-child{border-top:0}
+  .ipa{font-size:28px;font-weight:800}
+  .desc{color:var(--muted);font-size:13px}
+  .word{display:flex;flex-direction:column}
+  .word small{color:var(--muted);font-size:12px}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .muted{color:var(--muted)}
+  details{margin-top:8px}
+  summary{cursor:pointer;color:#9fd0ff}
+  .rec-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .rec-item{display:flex;align-items:center;gap:8px;background:#0b1228;border:1px solid var(--border);padding:8px;border-radius:10px}
+  audio{width:220px;max-width:60vw}
+  .hint{font-size:12px;color:#9ca3af;margin-top:6px}
+  .spacer{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>IPA Trainer — /ə/ /ɚ/ /ɝː/（TTS + 录音存储）</h1>
+  <p class="sub">音标原音用 <b>Local</b>（你已把 mp3 放仓库根目录）；示例单词用 <b>TTS</b> 播放。录音会保存到当前浏览器（localStorage），你可随时回放。</p>
+
+  <div class="toolbar">
+    <span class="pill">Playback:
+      <label><input type="radio" name="src" value="local" checked> Local（音标原音）</label>
+      <label><input type="radio" name="src" value="tts"> TTS（仅示例单词）</label>
+    </span>
+    <span class="pill">Voice: <select id="voice"></select></span>
+    <span class="pill">Rate <input id="rate" type="range" min="0.7" max="1.1" step="0.05" value="0.85">
+      <span id="rateV">0.85</span></span>
+    <span class="pill">Pitch <input id="pitch" type="range" min="0.9" max="1.2" step="0.05" value="1.00">
+      <span id="pitchV">1.00</span></span>
+
+    <span class="spacer"></span>
+
+    <!-- 自动播放控制 -->
+    <span class="pill">
+      <button class="secondary" id="autoPlayBtn">▶ 自动播放全部（100x）</button>
+      <button class="warn" id="autoStopBtn" disabled>■ 停止</button>
+    </span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="hint">提示：首次录音需允许麦克风；在手机端请通过 HTTPS（GitHub Pages）访问。</p>
+
+  <!-- 隐藏的播放器：只用于播放“音标原音”的本地 mp3 -->
+  <audio id="phonemeAudio" preload="none"></audio>
+</div>
+
+<script>
+/* ====== 数据：三组音标与示例（含 IPA） ====== */
+const DATA = [
+  {
+    phoneme: '/ə/',
+    desc: 'Schwa：中央放松（弱读的中元音）。',
+    src: './us_phonetics_sound_above_2023feb.mp3',
+    words: [
+      {w:'about', ipa:'əˈbaʊt'},
+      {w:'banana', ipa:'bəˈnænə'},
+      {w:'sofa', ipa:'ˈsoʊfə'},
+      {w:'open', ipa:'ˈoʊpən'},
+      {w:'problem', ipa:'ˈprɑːbləm'},
+      {w:'synthesis', ipa:'ˈsɪnθəsɪs'},
+      {w:'animal', ipa:'ˈænɪməl'},
+      {w:'president', ipa:'ˈprezɪdənt'},
+      {w:'pupil', ipa:'ˈpjuːpəl'},
+      {w:'bacon', ipa:'ˈbeɪkən'},
+      {w:'lesson', ipa:'ˈlesən'},
+      {w:'pilot', ipa:'ˈpaɪlət'},
+      {w:'circus', ipa:'ˈsɝːkəs'},
+      {w:'medium', ipa:'ˈmiːdiəm'},
+      {w:'support', ipa:'səˈpɔːrt'},
+      {w:'courageous', ipa:'kəˈreɪdʒəs'},
+      {w:'famous', ipa:'ˈfeɪməs'},
+      {w:'humorous', ipa:'ˈhjuːmərəs'},
+    ]
+  },
+  {
+    phoneme: '/ɚ/',
+    desc: '弱读卷舌（r-colored 弱读）。',
+    src: './us_phonetics_sound_mother_2023feb.mp3',
+    words: [
+      {w:'better', ipa:'ˈbet̬ɚ'},
+      {w:'butter', ipa:'ˈbʌt̬ɚ'},
+      {w:'teacher', ipa:'ˈtiːtʃɚ'},
+      {w:'actor', ipa:'ˈæk.tɚ'},
+      {w:'doctor', ipa:'ˈdɑːktɚ'},
+      {w:'editor', ipa:'ˈed.ɪ.t̬ɚ'},
+      {w:'beggar', ipa:'ˈbeɡɚ'},
+      {w:'burglar', ipa:'ˈbɝːɡlɚ'},
+      {w:'collar', ipa:'ˈkɑːlɚ'},
+      {w:'culture', ipa:'ˈkʌltʃɚ'},
+      {w:'figure', ipa:'ˈfɪɡjɚ'},
+      {w:'pressure', ipa:'ˈpreʃɚ'},
+    ]
+  },
+  {
+    phoneme: '/ɝː/',
+    desc: '重读卷舌（r-colored 重读）。',
+    src: './us_phonetics_sound_mother_2023feb.mp3',
+    words: [
+      {w:'her', ipa:'hɝː'},
+      {w:'term', ipa:'tɝːm'},
+      {w:'clerk', ipa:'klɝːk'},
+      {w:'earn', ipa:'ɝːn'},
+      {w:'earth', ipa:'ɝːθ'},
+      {w:'heard', ipa:'hɝːd'},
+      {w:'bird', ipa:'bɝːd'},
+      {w:'first', ipa:'ˈfɝːst'},
+      {w:'stir', ipa:'stɝː'},
+      {w:'burn', ipa:'bɝːn'},
+      {w:'nurse', ipa:'nɝːs'},
+      {w:'turn', ipa:'tɝːn'},
+      {w:'word', ipa:'wɝːd'},
+      {w:'world', ipa:'wɝːld'},
+      {w:'worse', ipa:'wɝːs'},
+    ]
+  }
+];
+
+/* ====== 语音合成（TTS） ====== */
+const synth = window.speechSynthesis;
+let voices = [];
+const voiceSel = document.getElementById('voice');
+const rateEl = document.getElementById('rate'), pitchEl = document.getElementById('pitch');
+const rateV = document.getElementById('rateV'), pitchV = document.getElementById('pitchV');
+
+function loadVoices(){
+  voices = synth.getVoices().filter(v=>/en/i.test(v.lang));
+  voiceSel.innerHTML='';
+  voices.forEach((v,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i; opt.textContent=`${v.name} — ${v.lang}`;
+    if(/en-US/.test(v.lang) && /Google|Microsoft|Samantha|Natural|Neural/i.test(v.name)) opt.selected=true;
+    voiceSel.appendChild(opt);
+  });
+}
+loadVoices();
+if (typeof speechSynthesis!=='undefined'){ speechSynthesis.onvoiceschanged=loadVoices; }
+
+rateEl.oninput=()=>rateV.textContent=Number(rateEl.value).toFixed(2);
+pitchEl.oninput=()=>pitchV.textContent=Number(pitchEl.value).toFixed(2);
+
+/** 生成一个 Utterance（不强制 cancel，便于自动播放串联） */
+function makeUtterance(text){
+  const u = new SpeechSynthesisUtterance(text);
+  const v = voices[voiceSel.value|0] || voices.find(x=>/en-US/i.test(x.lang)) || voices[0];
+  if (v){ u.voice=v; u.lang=v.lang; } else { u.lang='en-US'; }
+  u.rate=parseFloat(rateEl.value);
+  u.pitch=parseFloat(pitchEl.value);
+  return u;
+}
+
+/** 单词点击播放（独立一次，先取消队列） */
+function speakWordOnce(text){
+  synth.cancel();
+  synth.speak(makeUtterance(text));
+}
+
+/* ====== 播放源 ====== */
+function mode(){ return document.querySelector('input[name="src"]:checked').value; }
+
+/* ====== DOM 渲染 ====== */
+const grid = document.getElementById('grid');
+const phonemeAudio = document.getElementById('phonemeAudio');
+
+function render(){
+  grid.innerHTML = '';
+  DATA.forEach(block=>{
+    const card = document.createElement('section');
+    card.className='card';
+
+    const head = document.createElement('div');
+    head.className='row';
+    head.innerHTML = `
+      <div>
+        <div class="ipa">${block.phoneme}</div>
+        <div class="desc">${block.desc}</div>
+      </div>
+      <div class="btns">
+        <button class="primary" data-phoneme="${block.phoneme}">🔊 音标原音</button>
+      </div>
+    `;
+    card.appendChild(head);
+
+    block.words.forEach(item=>{
+      const row = document.createElement('div');
+      row.className='row';
+      row.innerHTML = `
+        <div class="word">
+          <strong>${item.w}</strong>
+          <small>/${item.ipa}/</small>
+        </div>
+        <div class="btns">
+          <button class="primary" data-play="${item.w}">🔊 播放</button>
+          <button class="success" data-rec="${item.w}">🎙 录音并保存</button>
+        </div>
+      `;
+      const details = document.createElement('details');
+      details.innerHTML = `
+        <summary>我的录音（${item.w}）</summary>
+        <div class="rec-list" id="rec-${sanitize(item.w)}"></div>
+      `;
+      card.appendChild(row);
+      card.appendChild(details);
+
+      // 初次渲染已存录音
+      renderRecordings(item.w);
+    });
+
+    grid.appendChild(card);
+  });
+}
+render();
+
+/* ====== 交互：播放 音标原音 / 单词（TTS） ====== */
+grid.addEventListener('click', async (evt)=>{
+  const btn = evt.target.closest('button');
+  if(!btn) return;
+
+  const ph = btn.getAttribute('data-phoneme');
+  const w  = btn.getAttribute('data-play');
+  const r  = btn.getAttribute('data-rec');
+
+  if (ph){
+    const block = DATA.find(x=>x.phoneme===ph);
+    if (!block) return;
+    try{
+      phonemeAudio.src = block.src;
+      phonemeAudio.currentTime = 0;
+      await phonemeAudio.play();
+    }catch(err){
+      console.warn(err);
+      alert('无法播放音标原音：请确认 mp3 已放在仓库根目录并允许音频播放。');
+    }
+  }
+
+  if (w){
+    // 单词用 TTS（保持一致）
+    if (mode()==='tts' || mode()==='local'){
+      speakWordOnce(w);
+    }
+  }
+
+  if (r){
+    startRecordingFor(r);
+  }
+});
+
+/* ====== 自动播放全部单词（100 次） ====== */
+const autoPlayBtn = document.getElementById('autoPlayBtn');
+const autoStopBtn = document.getElementById('autoStopBtn');
+let autoRunning = false;
+
+function getAllWords(){
+  return DATA.flatMap(b=>b.words.map(x=>x.w));
+}
+
+function wait(ms){ return new Promise(r=>setTimeout(r, ms)); }
+function speakOnceAsync(text){
+  return new Promise((resolve,reject)=>{
+    const u = makeUtterance(text);
+    u.onend = resolve;
+    u.onerror = (e)=>reject(e.error||e);
+    synth.speak(u);
+  });
+}
+
+autoPlayBtn.addEventListener('click', async ()=>{
+  if (autoRunning) return;
+  autoRunning = true;
+  autoPlayBtn.disabled = true;
+  autoStopBtn.disabled = false;
+
+  const LOOP = 100;
+  const words = getAllWords();
+  // 开始前清空队列
+  synth.cancel();
+
+  try{
+    for (let i=0; i<LOOP && autoRunning; i++){
+      for (let j=0; j<words.length && autoRunning; j++){
+        await speakOnceAsync(words[j]);
+        await wait(250); // 每个词之间停顿 250ms
+      }
+      await wait(600); // 每轮之间稍作停顿
+    }
+  }catch(e){
+    console.warn('Auto play error:', e);
+  }finally{
+    autoRunning = false;
+    autoPlayBtn.disabled = false;
+    autoStopBtn.disabled = true;
+  }
+});
+
+autoStopBtn.addEventListener('click', ()=>{
+  if (!autoRunning) return;
+  autoRunning = false;
+  synth.cancel();
+  autoPlayBtn.disabled = false;
+  autoStopBtn.disabled = true;
+});
+
+/* ====== 录音并保存到 localStorage（每次约 2 秒） ====== */
+let mediaStream, mediaRecorder, chunks=[];
+async function ensureMic(){
+  if (mediaStream) return mediaStream;
+  mediaStream = await navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:true,noiseSuppression:true}
+  });
+  return mediaStream;
+}
+function sanitize(name){ return name.toLowerCase().replace(/[^a-z0-9_-]/g,'_'); }
+
+async function startRecordingFor(word){
+  try{
+    await ensureMic(); chunks=[];
+    // 选择更通用的容器，尽量兼容 Safari / Chrome
+    const mime =
+      MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' :
+      (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
+
+    mediaRecorder = new MediaRecorder(mediaStream, mime?{mimeType:mime}:{});
+    mediaRecorder.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+    mediaRecorder.onstop = async ()=>{
+      const blobType = mime || 'audio/webm';
+      const blob = new Blob(chunks, {type: blobType});
+      const dataUrl = await blobToDataURL(blob);
+      saveRecording(word, {ts: Date.now(), mime: blobType, dataUrl});
+      renderRecordings(word);
+    };
+    mediaRecorder.start();
+    setTimeout(()=> mediaRecorder.stop(), 2000);
+  }catch(err){
+    console.error(err);
+    alert('无法录音：请允许麦克风；手机端请用 HTTPS（GitHub Pages）访问。');
+  }
+}
+
+function blobToDataURL(blob){
+  return new Promise(res=>{
+    const fr = new FileReader();
+    fr.onload = ()=>res(fr.result);
+    fr.readAsDataURL(blob);
+  });
+}
+
+/* ====== 本地存储（localStorage）：按单词保存多条 ====== */
+function keyOf(word){ return 'rec_' + sanitize(word); }
+
+function loadRecordings(word){
+  try{
+    const raw = localStorage.getItem(keyOf(word));
+    return raw ? JSON.parse(raw) : [];
+  }catch(_){ return []; }
+}
+
+function saveRecording(word, rec){
+  const arr = loadRecordings(word);
+  arr.unshift(rec);
+  // 只保留最近 10 条
+  localStorage.setItem(keyOf(word), JSON.stringify(arr.slice(0,10)));
+}
+
+function deleteRecording(word, ts){
+  const arr = loadRecordings(word).filter(x=>x.ts!==ts);
+  localStorage.setItem(keyOf(word), JSON.stringify(arr));
+}
+
+function renderRecordings(word){
+  const list = document.getElementById('rec-' + sanitize(word));
+  if (!list) return;
+  const items = loadRecordings(word);
+  list.innerHTML = '';
+  if (items.length===0){
+    list.innerHTML = '<div class="muted">暂无录音</div>';
+    return;
+  }
+  items.forEach(item=>{
+    const div = document.createElement('div');
+    div.className = 'rec-item';
+    const time = new Date(item.ts).toLocaleString();
+    div.innerHTML = `
+      <span class="muted">${time}</span>
+      <audio controls src="${item.dataUrl}" type="${item.mime}"></audio>
+      <button class="warn" data-del="${item.ts}" data-word="${word}">删除</button>
+    `;
+    list.appendChild(div);
+  });
+
+  // 绑定删除
+  list.querySelectorAll('button[data-del]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const ts = Number(btn.getAttribute('data-del'));
+      const w  = btn.getAttribute('data-word');
+      deleteRecording(w, ts);
+      renderRecordings(w);
+    };
+  });
+}
+
+/* ====== 初始化：UI 小交互 ====== */
+document.getElementById('rate').addEventListener('input', ()=> rateV.textContent = Number(rateEl.value).toFixed(2));
+document.getElementById('pitch').addEventListener('input', ()=> pitchV.textContent = Number(pitchEl.value).toFixed(2));
+</script>
+</body>
+</html>
