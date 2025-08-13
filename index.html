@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IPA Trainer — /ə/ /ɚ/ /ɝː/</title>
+<style>
+  :root{
+    --bg:#0b1022; --bg2:#0f172a; --card:#0f172a; --border:#1f2937;
+    --txt:#e5e7eb; --muted:#9ca3af; --primary:#60a5fa; --green:#22c55e; --blue:#3b82f6; --red:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,var(--bg),var(--bg2) 30%,var(--bg));color:var(--txt);
+       font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1100px;margin:24px auto;padding:16px}
+  h1{margin:0 0 6px;font-weight:800}
+  .sub{color:var(--muted);margin:0 0 16px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+  .pill{display:inline-flex;align-items:center;gap:8px;background:#0b1228;border:1px solid var(--border);
+        padding:8px 10px;border-radius:12px}
+  select,button,input[type="range"]{appearance:none}
+  button{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer;color:#071426;background:#2d3648}
+  button.primary{background:var(--primary);color:#041422}
+  button.secondary{background:#22d3ee;color:#052430}
+  button.success{background:var(--green);color:#06240b}
+  button.warn{background:var(--red);color:#3a0a0a}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:14px}
+  @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+  .card{background:rgba(17,24,39,.75);backdrop-filter:blur(6px);border:1px solid var(--border);
+        border-radius:16px;padding:14px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed var(--border)}
+  .row:first-child{border-top:0}
+  .ipa{font-size:28px;font-weight:800}
+  .desc{color:var(--muted);font-size:13px}
+  .word{display:flex;flex-direction:column}
+  .word small{color:var(--muted)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .muted{color:var(--muted)}
+  .score{font-weight:800}
+  .hint{font-size:12px;color:var(--muted)}
+  .hidden{display:none}
+  .chip{border:1px solid var(--border);padding:4px 8px;border-radius:999px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>IPA Trainer — /ə/ /ɚ/ /ɝː/</h1>
+  <p class="sub">点击 <b>🔊 播放</b> → 跟读 → 点击 <b>🎙 录音</b> 自检。默认使用 <span class="chip">TTS</span>（美式、慢速）。</p>
+
+  <div class="toolbar">
+    <span class="pill">Playback Source:
+      <label><input type="radio" name="src" value="tts" checked> TTS</label>
+      <label><input type="radio" name="src" value="local"> Local</label>
+    </span>
+    <span class="pill">Voice: <select id="voice"></select></span>
+    <span class="pill">Rate <input id="rate" type="range" min="0.6" max="1.1" step="0.05" value="0.75">
+      <span id="rateV">0.75</span></span>
+    <span class="pill">Pitch <input id="pitch" type="range" min="0.8" max="1.3" step="0.05" value="1.00">
+      <span id="pitchV">1.00</span></span>
+    <button id="autoBtn" class="secondary">▶ 自动播放本页所有单词</button>
+  </div>
+
+  <!-- 三组音标 -->
+  <div class="grid">
+    <!-- /ə/ -->
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="ipa">/ə/</div>
+          <div class="desc">Schwa：中央、放松、短促。如 <i>about</i> 开头。</div>
+          <div class="hint">口型松、舌中部放松、时长短。</div>
+        </div>
+        <button class="primary" data-type="phoneme" data-key="ə">🔊 播放</button>
+      </div>
+      <div class="row">
+        <div class="word"><strong>about</strong> <small>/əˈbaʊt/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="about">🔊</button>
+          <button class="success rec" data-key="about">🎙 录音</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="word"><strong>banana</strong> <small>/bəˈnænə/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="banana">🔊</button>
+          <button class="success rec" data-key="banana">🎙 录音</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="word"><strong>sofa</strong> <small>/ˈsoʊfə/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="sofa">🔊</button>
+          <button class="success rec" data-key="sofa">🎙 录音</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- /ɚ/ -->
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="ipa">/ɚ/</div>
+          <div class="desc">弱读卷舌；短而轻。如 <i>better</i> 词尾。</div>
+          <div class="hint">舌尖微卷或舌根抬起，力度轻。</div>
+        </div>
+        <button class="primary" data-type="phoneme" data-key="ɚ">🔊 播放</button>
+      </div>
+      <div class="row">
+        <div class="word"><strong>better</strong> <small>/ˈbet̬ɚ/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="better">🔊</button>
+          <button class="success rec" data-key="better">🎙 录音</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="word"><strong>butter</strong> <small>/ˈbʌt̬ɚ/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="butter">🔊</button>
+          <button class="success rec" data-key="butter">🎙 录音</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="word"><strong>teacher</strong> <small>/ˈtiːtʃɚ/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="teacher">🔊</button>
+          <button class="success rec" data-key="teacher">🎙 录音</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- /ɝː/ -->
+    <section class="card">
+      <div class="row">
+        <div>
+          <div class="ipa">/ɝː/</div>
+          <div class="desc">重读卷舌；更饱满、更长。如 <i>her</i>, <i>bird</i>。</div>
+          <div class="hint">保持卷舌+更长时值。</div>
+        </div>
+        <button class="primary" data-type="phoneme" data-key="ɝː">🔊 播放</button>
+      </div>
+      <div class="row">
+        <div class="word"><strong>her</strong> <small>/hɝː/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="her">🔊</button>
+          <button class="success rec" data-key="her">🎙 录音</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="word"><strong>term</strong> <small>/tɝːm/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="term">🔊</button>
+          <button class="success rec" data-key="term">🎙 录音</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="word"><strong>bird</strong> <small>/bɝːd/</small></div>
+        <div class="btns">
+          <button class="primary" data-type="word" data-key="bird">🔊</button>
+          <button class="success rec" data-key="bird">🎙 录音</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 听辨测试 -->
+  <section class="card" style="margin-top:18px">
+    <h3 style="margin:0 0 8px">听辨测试</h3>
+    <p class="muted">点击“播放测试音”，选择它属于哪个音标；系统统计正确率。</p>
+    <div class="toolbar">
+      <button id="playTest" class="secondary">▶ 播放测试音</button>
+      <button class="choice" data-phoneme="/ə/">/ə/</button>
+      <button class="choice" data-phoneme="/ɚ/">/ɚ/</button>
+      <button class="choice" data-phoneme="/ɝː/">/ɝː/</button>
+      <span class="pill">正确率：<span id="acc" class="score">0%</span>（<span id="hit">0</span>/<span id="tot">0</span>）</span>
+    </div>
+    <div id="feedback" class="muted"></div>
+  </section>
+
+  <!-- 录音状态 -->
+  <section class="card" style="margin-top:18px">
+    <h3 style="margin:0 0 8px">录音区</h3>
+    <p class="muted">点击任一单词旁的 <b>🎙 录音</b>；录 2 秒后自动回放。若要 A/B 对比：先点单词 <b>🔊</b> 再录。</p>
+    <audio id="playback" controls class="hidden"></audio>
+    <div id="recStatus" class="muted"></div>
+    <div class="hint">提示：移动端需在 <b>HTTPS</b> 页面（GitHub Pages 即可）授权麦克风；若误点“禁止”，在浏览器地址栏的麦克风图标里重新允许。</div>
+  </section>
+
+  <audio id="localAudio" class="hidden"></audio>
+</div>
+
+<script>
+/* ========= 语音合成（TTS） ========= */
+const synth = window.speechSynthesis;
+let voices = [];
+const voiceSel = document.getElementById('voice');
+const rateEl = document.getElementById('rate'), pitchEl = document.getElementById('pitch');
+const rateV = document.getElementById('rateV'), pitchV = document.getElementById('pitchV');
+
+function loadVoices(){
+  voices = synth.getVoices().filter(v => /en/i.test(v.lang));
+  voiceSel.innerHTML = '';
+  voices.forEach((v,i)=>{
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = `${v.name} — ${v.lang}`;
+    if(/en-US/i.test(v.lang) && /Microsoft|Google|Samantha|Natural|Neural/i.test(v.name)) opt.selected = true;
+    voiceSel.appendChild(opt);
+  });
+}
+loadVoices();
+if (typeof speechSynthesis !== 'undefined') {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+rateEl.addEventListener('input', ()=> rateV.textContent = Number(rateEl.value).toFixed(2));
+pitchEl.addEventListener('input', ()=> pitchV.textContent = Number(pitchEl.value).toFixed(2));
+
+function speak(text){
+  const u = new SpeechSynthesisUtterance(text);
+  const v = voices[voiceSel.value|0] || voices[0];
+  if (v){ u.voice = v; u.lang = v.lang; } else { u.lang = 'en-US'; }
+  u.rate = parseFloat(rateEl.value);
+  u.pitch = parseFloat(pitchEl.value);
+  u.volume = 1;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+/* ========= 数据 ========= */
+const PHONEME_TTS = { 'ə':'uh', 'ɚ':'er', 'ɝː':'err' }; // 便于 TTS 读出靠近的音色
+const WORDS = [
+  {key:'about', ipa:'əˈbaʊt', phoneme:'/ə/'},
+  {key:'banana', ipa:'bəˈnænə', phoneme:'/ə/'},
+  {key:'sofa', ipa:'ˈsoʊfə', phoneme:'/ə/'},
+  {key:'better', ipa:'ˈbet̬ɚ', phoneme:'/ɚ/'},
+  {key:'butter', ipa:'ˈbʌt̬ɚ', phoneme:'/ɚ/'},
+  {key:'teacher', ipa:'ˈtiːtʃɚ', phoneme:'/ɚ/'},
+  {key:'her', ipa:'hɝː', phoneme:'/ɝː/'},
+  {key:'term', ipa:'tɝːm', phoneme:'/ɝː/'},
+  {key:'bird', ipa:'bɝːd', phoneme:'/ɝː/'}
+];
+
+const localAudio = document.getElementById('localAudio');
+function playLocal(src){
+  return new Promise((resolve,reject)=>{
+    localAudio.onended = resolve;
+    localAudio.onerror = reject;
+    localAudio.src = src; localAudio.play().catch(reject);
+  });
+}
+function sourceMode(){ return document.querySelector('input[name="src"]:checked').value; }
+
+function playPhoneme(ipa){
+  if (sourceMode()==='local'){
+    const map = {'ə':'audio/ə.mp3','ɚ':'audio/ɚ.mp3','ɝː':'audio/ɝː.mp3'};
+    const src = map[ipa];
+    if (src) return playLocal(src).catch(()=>speak(PHONEME_TTS[ipa]||ipa));
+  }
+  speak(PHONEME_TTS[ipa] || ipa);
+}
+function playWord(key){
+  if (sourceMode()==='local'){
+    const src = `audio/${key}.mp3`;
+    return playLocal(src).catch(()=>speak(key));
+  }
+  speak(key);
+}
+
+/* ========= 绑定播放按钮 ========= */
+document.querySelectorAll('button[data-type="phoneme"]').forEach(btn=>{
+  btn.addEventListener('click', ()=> playPhoneme(btn.dataset.key));
+});
+document.querySelectorAll('button[data-type="word"]').forEach(btn=>{
+  btn.addEventListener('click', ()=> playWord(btn.dataset.key));
+});
+
+/* ========= 自动播放一轮 ========= */
+const autoBtn = document.getElementById('autoBtn');
+let autoRunning = false;
+autoBtn.addEventListener('click', async ()=>{
+  if(autoRunning){ autoRunning=false; autoBtn.textContent='▶ 自动播放本页所有单词'; return; }
+  autoRunning = true; autoBtn.textContent='⏹ 停止';
+  for(const w of WORDS){
+    if(!autoRunning) break;
+    await new Promise(r=>setTimeout(r,300));
+    await (playWord(w.key)||Promise.resolve());
+    await new Promise(r=>setTimeout(r,1600));
+  }
+  autoRunning=false; autoBtn.textContent='▶ 自动播放本页所有单词';
+});
+
+/* ========= 录音功能 ========= */
+const recStatus = document.getElementById('recStatus');
+const playback = document.getElementById('playback');
+let mediaStream, mediaRecorder, chunks=[];
+
+async function ensureMic(){
+  if(mediaStream) return mediaStream;
+  // iOS/Android/桌面都通用；Safari 需要 HTTPS（GitHub Pages 满足）
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true } });
+  return mediaStream;
+}
+async function record2s(){
+  try{
+    await ensureMic();
+    chunks=[];
+    // Safari 支持 webm/opus；老设备可能只支持 default
+    const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+    mediaRecorder = new MediaRecorder(mediaStream, mime?{mimeType:mime}:{});
+    return new Promise(resolve=>{
+      mediaRecorder.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = ()=>{
+        const blob = new Blob(chunks, { type: mime || 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        playback.src = url; playback.classList.remove('hidden'); playback.play();
+        recStatus.textContent = '录音完成，已自动回放';
+        resolve();
+      };
+      mediaRecorder.start();
+      recStatus.textContent = '录音中… (2 秒)';
+      setTimeout(()=> mediaRecorder.state==='recording' && mediaRecorder.stop(), 2000);
+    });
+  }catch(err){
+    console.error(err);
+    recStatus.textContent = '❌ 无法录音：请在浏览器地址栏开启麦克风权限；移动端请使用 HTTPS 页面（如 GitHub Pages）。';
+  }
+}
+document.querySelectorAll('.rec').forEach(btn=>{
+  btn.addEventListener('click', record2s);
+});
+
+/* ========= 听辨测试 ========= */
+let current=null, hits=0, total=0;
+const hitEl = document.getElementById('hit'), totEl = document.getElementById('tot'), accEl = document.getElementById('acc');
+const feedback = document.getElementById('feedback');
+
+function updateScore(){
+  hitEl.textContent = hits; totEl.textContent = total;
+  accEl.textContent = total ? Math.round(hits*100/total)+'%' : '0%';
+}
+function pick(){ return WORDS[Math.floor(Math.random()*WORDS.length)]; }
+function playTest(){ current = pick(); playWord(current.key); feedback.textContent='已播放测试音，选择它属于哪个音标。'; }
+document.getElementById('playTest').addEventListener('click', playTest);
+document.querySelectorAll('.choice').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(!current){ feedback.textContent='请先播放测试音'; return; }
+    total++;
+    const guess = btn.dataset.phoneme;
+    if(guess===current.phoneme){ hits++; feedback.textContent='✅ 正确：'+current.key+' → '+current.phoneme; }
+    else{ feedback.textContent='❌ 错误：'+current.key+' → '+current.phoneme; }
+    updateScore(); current=null;
+  });
+});
+</script>
+</body>
+</html>
