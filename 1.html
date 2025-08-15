@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>美式元音播放器（ə / ɚ / ɝː 全功能版）</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#111827; --panel:#0f172a; --card:#121826; --muted:#9aa4b2; --text:#e5e7eb;
+    --blue:#2f80ed; --blue2:#1c65c8; --hlIpa:#3ddc97; --hlWord:#fff3bf; --hlBorder:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; padding:14px; font-family:'Noto Sans',system-ui,-apple-system,Segoe UI,Roboto,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--text); background:linear-gradient(180deg,#0d1320,#0b1220 40%,#0a0f1a);
+  }
+  h1{font-size:22px; margin:6px 0 10px; text-align:center}
+  .toolbar{
+    position:sticky; top:0; z-index:9; padding:10px; margin:0 auto 12px; max-width:980px;
+    background:rgba(15,23,42,.9); border:1px solid rgba(148,163,184,.15); border-radius:14px;
+    display:grid; gap:10px; grid-template-columns:1fr; }
+  @media (min-width:760px){ .toolbar{grid-template-columns:1fr 1fr} }
+  .row{display:flex; flex-wrap:wrap; align-items:center; gap:10px}
+  label{font-size:12px; color:var(--muted)}
+  select, input[type=range]{
+    border:1px solid rgba(148,163,184,.25); background:#0b1220; color:var(--text); padding:8px 10px; border-radius:10px;
+  }
+  .btn{background:var(--blue); color:#fff; border:none; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer}
+  .btn:hover{background:var(--blue2)}
+  .btn:active{transform:scale(.98)}
+  .tip{max-width:980px; margin:0 auto 10px; font-size:12px; color:var(--muted); text-align:center}
+
+  .vowel{background:var(--card); padding:14px; border-radius:14px; margin:10px auto; max-width:980px; border:2px solid transparent}
+  .vowel.active{border-color:var(--hlBorder)}
+  .ipaLine{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+  .ipaBtn{font-size:26px; font-weight:700; color:var(--hlIpa); cursor:pointer}
+  .ipaTip{font-size:12px; color:#cfe6ff}
+
+  .section{margin-top:8px; border-top:1px dashed rgba(148,163,184,.25); padding-top:8px}
+  .secTitle{font-size:13px; color:#a8ffef; margin-bottom:6px}
+
+  .examples{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px}
+  .word-item{display:grid; grid-template-columns:auto 1fr auto; gap:6px; align-items:center;
+    background:rgba(255,255,255,.06); border-radius:12px; padding:8px}
+  .word-item.active{background: var(--hlWord); color:#222; box-shadow:0 0 0 2px rgba(245,158,11,.25) inset}
+  .word-text{font-size:16px; font-weight:700}
+  .word-ipa{font-size:12px; color:var(--muted)}
+  .word-zh{font-size:12px; color:#ffd166}
+  .play-btn{background:var(--blue); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-size:12px; display:flex; align-items:center; gap:6px}
+  .play-btn:hover{background:var(--blue2)}
+  .play-icon{font-weight:700}
+
+  .foot{max-width:980px; margin:12px auto; color:var(--muted); font-size:12px; text-align:center}
+</style>
+</head>
+<body>
+  <h1>美式元音播放器（ə / ɚ / ɝː）</h1>
+
+  <div class="toolbar">
+    <div class="row">
+      <label>英文音色：</label><select id="enVoice" style="min-width:180px"></select>
+      <label>中文音色：</label><select id="zhVoice" style="min-width:180px"></select>
+    </div>
+    <div class="row">
+      <label>语速：</label><input id="rate" type="range" min="0.6" max="1.6" step="0.05" value="1">
+      <label>音量：</label><input id="volume" type="range" min="0" max="1" step="0.05" value="1">
+      <button class="btn" id="autoPlay">自动播放全部</button>
+      <button class="btn" id="stop">停止</button>
+    </div>
+  </div>
+
+  <p class="tip">点击<strong>音标</strong>：中文要点 → 播放 GitHub 原音；点击<strong>例词右侧蓝色按钮</strong>：英文 → <b>1 秒</b> → 中文 → <b>1 秒</b> → 英文。自动播放按你给的顺序依次播放，播放中高亮当前音标与单词。</p>
+
+  <div id="root"></div>
+
+  <div class="foot">音标音频来自你的 GitHub：<code>wyy1054663844-alt/phonics8.13</code>（规则：<code>ː → _long</code>，例：<code>ɝː → ɝ_long.mp3</code>）。</div>
+
+<script>
+/* ===================== 基础配置（兼容版） ===================== */
+var BASE = "https://wyy1054663844-alt.github.io/phonics8.13/";
+function ipaToFile(ipa){
+  var name = ipa.replace("ː","_long"); // ɝː -> ɝ_long
+  return BASE + encodeURIComponent(name) + ".mp3";
+}
+function wait(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+
+/* ===================== 发音要点（中文） ===================== */
+var IPA_TIP = {
+  "ə":"轻读元音（schwa），短而轻，口型放松、舌位居中，多出现在非重读音节。",
+  "ɚ":"卷舌的弱读元音（儿化），短而轻，多见词尾 -er。",
+  "ɝː":"卷舌长元音，重读，音长稍延长，舌尖上卷接近上腭。"
+};
+
+/* ===================== 数据（严格按你的分组与顺序） ===================== */
+/* 结构：groups -> {ipa, sections:[{title, items:[{w, ipa, zh}]}]} */
+var GROUPS = [
+  { ipa:"ə", sections:[
+      { title:"a", items:[
+        {w:"about",    ipa:"/əˈbaʊt/",    zh:"关于"},
+        {w:"banana",   ipa:"/bəˈnæn.ə/", zh:"香蕉"},
+        {w:"sofa",     ipa:"/ˈsoʊ.fə/",  zh:"沙发"}
+      ]},
+      { title:"e", items:[
+        {w:"open",     ipa:"/ˈoʊ.pən/",  zh:"打开"},
+        {w:"problem",  ipa:"/ˈprɑː.bləm/", zh:"问题"},
+        {w:"synthesis",ipa:"/ˈsɪn.θə.sɪs/", zh:"合成"}
+      ]},
+      { title:"i", items:[
+        {w:"animal",   ipa:"/ˈæn.ɪ.məl/", zh:"动物"},
+        {w:"president",ipa:"/ˈprez.ɪ.dənt/", zh:"总统"},
+        {w:"pupil",    ipa:"/ˈpjuː.pəl/", zh:"学生"}
+      ]},
+      { title:"o", items:[
+        {w:"bacon",    ipa:"/ˈbeɪ.kən/", zh:"培根"},
+        {w:"lesson",   ipa:"/ˈles.ən/", zh:"课"},
+        {w:"pilot",    ipa:"/ˈpaɪ.lət/", zh:"飞行员"}
+      ]},
+      { title:"u", items:[
+        {w:"circus",   ipa:"/ˈsɝː.kəs/", zh:"马戏团"},
+        {w:"medium",   ipa:"/ˈmiː.di.əm/", zh:"中等；媒介"},
+        {w:"support",  ipa:"/səˈpɔːrt/", zh:"支持"}
+      ]},
+      { title:"ou", items:[
+        {w:"courageous", ipa:"/kəˈreɪ.dʒəs/", zh:"勇敢的"},
+        {w:"famous",     ipa:"/ˈfeɪ.məs/",   zh:"著名的"},
+        {w:"humorous",   ipa:"/ˈhjuː.mə.rəs/", zh:"幽默的"}
+      ]}
+  ]},
+  { ipa:"ɚ", sections:[
+      { title:"er", items:[
+        {w:"better",  ipa:"/ˈbet̬.ɚ/", zh:"更好"},
+        {w:"butter",  ipa:"/ˈbʌt̬.ɚ/", zh:"黄油"},
+        {w:"teacher", ipa:"/ˈtiː.tʃɚ/", zh:"老师"}
+      ]},
+      { title:"or", items:[
+        {w:"actor",  ipa:"/ˈæk.tɚ/",    zh:"演员"},
+        {w:"doctor", ipa:"/ˈdɑːk.tɚ/", zh:"医生"},
+        {w:"editor", ipa:"/ˈed.ɪ.t̬ɚ/", zh:"编辑"}
+      ]},
+      { title:"ar", items:[
+        {w:"beggar",  ipa:"/ˈbeɡ.ɚ/",     zh:"乞丐"},
+        {w:"burglar", ipa:"/ˈbɝː.ɡlɚ/",  zh:"窃贼"},
+        {w:"collar",  ipa:"/ˈkɑː.lɚ/",    zh:"衣领"}
+      ]},
+      { title:"ure", items:[
+        {w:"culture", ipa:"/ˈkʌl.tʃɚ/",  zh:"文化"},
+        {w:"figure",  ipa:"/ˈfɪɡ.jɚ/",   zh:"人物；数字"},
+        {w:"pressure",ipa:"/ˈpreʃ.ɚ/",   zh:"压力"}
+      ]}
+  ]},
+  { ipa:"ɝː", sections:[
+      { title:"er", items:[
+        {w:"her",  ipa:"/hɝː/",   zh:"她的；她（宾格）"},
+        {w:"term", ipa:"/tɝːm/",  zh:"学期；术语"},
+        {w:"clerk",ipa:"/klɝːk/", zh:"职员；店员"}
+      ]},
+      { title:"ear", items:[
+        {w:"earn",  ipa:"/ɝːn/",  zh:"赚得"},
+        {w:"earth", ipa:"/ɝːθ/",  zh:"地球；土"},
+        {w:"heard", ipa:"/hɝːd/", zh:"听到（过去）"}
+      ]},
+      { title:"ir", items:[
+        {w:"bird",  ipa:"/bɝːd/",  zh:"鸟"},
+        {w:"first", ipa:"/ˈfɝːst/", zh:"第一"},
+        {w:"stir",  ipa:"/stɝː/",   zh:"搅拌"}
+      ]},
+      { title:"ur", items:[
+        {w:"burn",  ipa:"/bɝːn/", zh:"燃烧"},
+        {w:"nurse", ipa:"/nɝːs/", zh:"护士"},
+        {w:"turn",  ipa:"/tɝːn/", zh:"转动"}
+      ]},
+      { title:"or", items:[
+        {w:"word",  ipa:"/wɝːd/",  zh:"单词"},
+        {w:"world", ipa:"/wɝːld/", zh:"世界"},
+        {w:"worse", ipa:"/wɝːs/",  zh:"更糟"}
+      ]}
+  ]}
+];
+
+/* ===================== 语音引擎（兼容） ===================== */
+var synth = window.speechSynthesis;
+var currentAudio = null;
+var stopFlag = false;
+var voicesReady = false;
+var enVoices = []; var zhVoices = [];
+
+function pickVoice(lang, selectId){
+  try{
+    var list = synth.getVoices() || [];
+    var i, arr = [];
+    for(i=0;i<list.length;i++){
+      var v = list[i];
+      if(!v || !v.lang) continue;
+      if(lang === 'en'){
+        if(/en[-_]/i.test(v.lang)) arr.push(v);
+      }else{
+        if(/^zh/i.test(v.lang) || /cmn/i.test(v.lang)) arr.push(v);
+      }
+    }
+    if(lang === 'en') enVoices = arr; else zhVoices = arr;
+
+    var sel = document.getElementById(selectId);
+    var html = "";
+    for(i=0;i<arr.length;i++){
+      html += '<option value="'+i+'">'+ arr[i].name +' ('+ arr[i].lang +')</option>';
+    }
+    sel.innerHTML = html;
+    // 默认选择
+    if(lang==='en'){
+      var idxUS = -1;
+      for(i=0;i<arr.length;i++){ if(/en-US/i.test(arr[i].lang)){ idxUS=i; break; } }
+      if(idxUS>=0) sel.value = String(idxUS);
+    }else{
+      var idxCN = -1;
+      for(i=0;i<arr.length;i++){ if(/zh-CN/i.test(arr[i].lang)){ idxCN=i; break; } }
+      if(idxCN>=0) sel.value = String(idxCN);
+    }
+  }catch(e){}
+}
+
+function loadVoicesWithRetry(){
+  // 不阻塞渲染：即使取不到，也允许播放（用系统默认）
+  pickVoice('en','enVoice');
+  pickVoice('zh','zhVoice');
+  if((enVoices && enVoices.length) || (zhVoices && zhVoices.length)){
+    voicesReady = true;
+    return;
+  }
+  // 多次尝试（兼容安卓 WebView 直到 voices 就绪）
+  var tries = 0;
+  var t = setInterval(function(){
+    pickVoice('en','enVoice');
+    pickVoice('zh','zhVoice');
+    tries++;
+    if((enVoices && enVoices.length) || (zhVoices && zhVoices.length) || tries>20){
+      voicesReady = true;
+      clearInterval(t);
+    }
+  }, 300);
+}
+if (synth && typeof synth.onvoiceschanged !== 'undefined'){
+  synth.onvoiceschanged = function(){ loadVoicesWithRetry(); };
+}
+setTimeout(loadVoicesWithRetry, 200);
+
+function currentRate(){ var x = parseFloat(document.getElementById('rate').value||'1'); return x>0?x:1; }
+function currentVol(){  var x = parseFloat(document.getElementById('volume').value||'1'); return (x>=0&&x<=1)?x:1; }
+
+function getVoice(lang){
+  try{
+    var sel = document.getElementById(lang==='en'?'enVoice':'zhVoice');
+    var idx = parseInt(sel.value,10);
+    var arr = (lang==='en')? enVoices : zhVoices;
+    if(arr && arr[idx]) return arr[idx];
+  }catch(e){}
+  return null; // 让浏览器自行选择默认
+}
+
+function speak(text, lang){
+  return new Promise(function(resolve){
+    try{
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = (lang==='en')? 'en-US':'zh-CN';
+      u.rate = currentRate();
+      u.volume = currentVol();
+      var v = getVoice(lang);
+      if(v) u.voice = v;
+      u.onend = function(){ resolve(); };
+      synth.speak(u);
+    }catch(e){ resolve(); }
+  });
+}
+
+function playAudio(url){
+  return new Promise(function(resolve){
+    try{ if(currentAudio){ currentAudio.pause(); currentAudio=null; } }catch(e){}
+    var a = new Audio(url);
+    currentAudio = a;
+    a.onended = function(){ currentAudio=null; resolve(); };
+    a.onerror = function(){ currentAudio=null; resolve(); };
+    a.play().catch(function(){ resolve(); });
+  });
+}
+// --- iOS WebAudio unlock + IPA解码播放（移植自1553思路，最小侵入） ---
+var waCtx = null;
+async function ensureAudioContext(){
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    if(!waCtx) waCtx = new AC();
+    if(waCtx.state === 'suspended') await waCtx.resume();
+    return waCtx;
+  }catch(e){ return null; }
+}
+
+async function fetchDecodePlay(url){
+  // 使用 WebAudio 解码播放；失败则回退到 <audio>
+  try{
+    var ctx = await ensureAudioContext();
+    if(!ctx) throw new Error('noctx');
+    var ab = await fetch(url,{cache:'force-cache'}).then(function(r){return r.arrayBuffer();});
+    var buf = await new Promise(function(res,rej){ ctx.decodeAudioData(ab, res, rej); });
+    await new Promise(function(resolve){
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.onended = resolve;
+      src.start(0);
+    });
+  }catch(e){
+    await playAudio(url);
+  }
+}
+
+
+/* ============= iOS 自动播放解锁：无声 TTS + 极短哔声 ============= */
+var unlocked = false;
+function unlockAudioOnce(){
+  return new Promise(function(resolve){
+    if(unlocked){ resolve(); return; }
+    var silent = new SpeechSynthesisUtterance(" ");
+    silent.volume = 0; silent.rate = 1; silent.lang = 'en-US';
+    silent.onend = function(){
+      // 很短的提示音，确保媒体解锁（兼容部分 iOS）
+      var b = new Audio('data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA'); // 极短无效帧，立即结束
+      b.play().catch(function(){}).finally(function(){ unlocked = true; resolve(); });
+    };
+    try{ synth.speak(silent); }catch(e){ unlocked = true; resolve(); }
+  });
+}
+
+/* ===================== 高亮工具 ===================== */
+function clearHighlights(){
+  var x,i;
+  x = document.querySelectorAll('.vowel'); for(i=0;i<x.length;i++){ x[i].classList.remove('active'); }
+  x = document.querySelectorAll('.word-item'); for(i=0;i<x.length;i++){ x[i].classList.remove('active'); }
+}
+function highlightIpa(ipa){
+  clearHighlights();
+  var el = document.querySelector('.vowel[data-ipa="'+ ipa.replace(/"/g,'\\"') +'"]');
+  if(el) el.classList.add('active');
+}
+function highlightWord(ipa, word){
+  var x,i;
+  x = document.querySelectorAll('.word-item'); for(i=0;i<x.length;i++){ x[i].classList.remove('active'); }
+  var sel = '.word-item[data-ipa="'+ ipa.replace(/"/g,'\\"') +'"][data-word="'+ word.replace(/"/g,'\\"') +'"]';
+  var el = document.querySelector(sel);
+  if(el) el.classList.add('active');
+}
+
+/* ===================== 播放序列 ===================== */
+function stopAll(){
+  stopFlag = true;
+  try{ synth.cancel(); }catch(e){}
+  try{ if(currentAudio){ currentAudio.pause(); currentAudio=null; } }catch(e){}
+  clearHighlights();
+}
+
+function playIpaWithTip(ipa){
+  return new Promise(async function(resolve){
+    stopFlag = false;
+    highlightIpa(ipa);
+    await speak(IPA_TIP[ipa]||"发音提示", 'zh');
+    if(stopFlag){ resolve(); return; }
+    await playAudio(ipaToFile(ipa));
+    resolve();
+  });
+}
+
+function playWordSeq(ipa, word, zh){
+  return new Promise(async function(resolve){
+    stopFlag = false;
+    highlightWord(ipa, word);
+    await speak(word, 'en');
+    if(stopFlag){ resolve(); return; }
+    await wait(1000);
+    await speak(zh, 'zh');
+    if(stopFlag){ resolve(); return; }
+    await wait(1000);
+    await speak(word, 'en');
+    resolve();
+  });
+}
+
+/* ===================== 页面渲染 ===================== */
+function render(){
+  var root = document.getElementById('root');
+  var i,j,k;
+  for(i=0;i<GROUPS.length;i++){
+    var g = GROUPS[i];
+    var card = document.createElement('div');
+    card.className = 'vowel';
+    card.setAttribute('data-ipa', g.ipa);
+
+    var line = document.createElement('div');
+    line.className = 'ipaLine';
+    var ipaBtn = document.createElement('span');
+    ipaBtn.className = 'ipaBtn';
+    ipaBtn.textContent = g.ipa;
+    ipaBtn.title = '点击：中文要点 → 播放该音标原音';
+    (function(ipa){ ipaBtn.addEventListener('click', function(){ stopAll(); playIpaWithTip(ipa); }); })(g.ipa);
+
+    var tip = document.createElement('span');
+    tip.className = 'ipaTip';
+    tip.textContent = IPA_TIP[g.ipa] || '发音提示';
+
+    line.appendChild(ipaBtn); line.appendChild(tip);
+    card.appendChild(line);
+
+    for(j=0;j<g.sections.length;j++){
+      var sec = g.sections[j];
+      var secBox = document.createElement('div'); secBox.className='section';
+      var title = document.createElement('div'); title.className='secTitle'; title.textContent = sec.title;
+      secBox.appendChild(title);
+
+      var list = document.createElement('div'); list.className='examples';
+      for(k=0;k<sec.items.length;k++){
+        var it = sec.items[k];
+        var row = document.createElement('div'); row.className='word-item';
+        row.setAttribute('data-ipa', g.ipa); row.setAttribute('data-word', it.w);
+
+        var t1 = document.createElement('div'); t1.className='word-text'; t1.textContent = it.w;
+        var t2 = document.createElement('div'); t2.className='word-ipa'; t2.textContent = it.ipa;
+        var t3 = document.createElement('div'); t3.className='word-zh';  t3.textContent  = it.zh;
+
+        var btn = document.createElement('button'); btn.className='play-btn';
+        btn.innerHTML = '<span class="play-icon">▶</span>播放';
+        (function(ipa, w, zh){ btn.addEventListener('click', function(){ stopAll(); playWordSeq(ipa, w, zh); }); })(g.ipa, it.w, it.zh);
+
+        row.appendChild(t1); row.appendChild(t2); row.appendChild(t3); row.appendChild(btn);
+        list.appendChild(row);
+      }
+      secBox.appendChild(list);
+      card.appendChild(secBox);
+    }
+    root.appendChild(card);
+  }
+}
+render();
+
+/* ===================== 自动播放全部 ===================== */
+document.getElementById('autoPlay').addEventListener('click', async function(){
+  stopAll(); stopFlag=false;
+  await unlockAudioOnce(); // iOS 解锁
+  for(var i=0;i<GROUPS.length;i++){
+    if(stopFlag) break;
+    var g = GROUPS[i];
+    await playIpaWithTip(g.ipa);
+    if(stopFlag) break;
+    for(var j=0;j<g.sections.length;j++){
+      if(stopFlag) break;
+      var sec = g.sections[j];
+      for(var k=0;k<sec.items.length;k++){
+        if(stopFlag) break;
+        var it = sec.items[k];
+        await wait(250);
+        await playWordSeq(g.ipa, it.w, it.zh);
+      }
+    }
+  }
+  clearHighlights();
+});
+
+document.getElementById('stop').addEventListener('click', stopAll);
+</script>
+</body>
+</html>
