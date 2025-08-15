@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>美式元音播放器（iOS自动播放版）</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #0f172a; color: #fff; margin: 0; padding: 10px; }
+  .card { background: #111827; margin-bottom: 10px; padding: 10px; border-radius: 8px; }
+  .ipa-btn { font-size: 24px; background: #222; color: #fff; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+  .row { display: flex; justify-content: space-between; align-items: center; background: #0b1220; padding: 5px; margin-top: 5px; border-radius: 6px; }
+  .row.playing { border: 1px solid orange; }
+  .play-btn { background: #3b82f6; color: white; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+<h1>美式元音播放器（iOS自动播放版）</h1>
+<button id="btnAuto">自动播放全部</button>
+<button id="btnStop">停止</button>
+<div id="grid"></div>
+
+<script>
+const data = [
+  { ipa:'ə', tip:'弱读央元音，口型放松，快而轻。', words:['about','banana','sofa','open','problem','synthesis','animal','president','pupil','bacon','lesson','pilot','circus','medium','support','courageous','famous','humorous'] },
+  { ipa:'ɚ', tip:'卷舌弱读元音，类似 “儿” 化。', words:['better','butter','teacher','actor','doctor','editor','beggar','burglar','collar','culture','figure','pressure'] },
+  { ipa:'ɝː', tip:'卷舌长元音，重读，时值更长。', words:['her','term','clerk','earn','earth','heard','bird','first','stir','burn','nurse','turn','word','world','worse'] }
+];
+
+const zh = { about:'关于', banana:'香蕉', sofa:'沙发', open:'打开', problem:'问题', synthesis:'合成', animal:'动物', president:'总统', pupil:'学生', bacon:'培根', lesson:'课', pilot:'飞行员', circus:'马戏团', medium:'中等/媒介', support:'支持', courageous:'勇敢的', famous:'著名的', humorous:'幽默的',
+better:'更好的', butter:'黄油', teacher:'老师', actor:'演员', doctor:'医生', editor:'编辑', beggar:'乞丐', burglar:'窃贼', collar:'衣领', culture:'文化', figure:'人物/数字', pressure:'压力',
+her:'她的', term:'学期/术语', clerk:'职员', earn:'赚取', earth:'地球', heard:'听见了', bird:'鸟', first:'第一', stir:'搅拌', burn:'燃烧', nurse:'护士', turn:'转动', word:'单词', world:'世界', worse:'更糟' };
+function zhAuto(w){return zh[w] || (w+'(待定)');}
+
+const synth = window.speechSynthesis;
+function speak(text, voice=null, rate=1, vol=1){ return new Promise(res=>{ const u=new SpeechSynthesisUtterance(text); if(voice) u.voice=voice; u.rate=rate; u.volume=vol; u.onend=()=>res(); synth.speak(u); }); }
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+
+let abort=false;
+function stopAll(){ abort=true; synth.cancel(); }
+document.getElementById('btnStop').onclick = stopAll;
+
+// iOS 解锁音频
+let iosUnlocked=false;
+function unlockAudioOnce(){
+  return new Promise(res=>{
+    if(iosUnlocked){ res(); return; }
+    const silent = new Audio();
+    silent.src = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAA..."; // 静音音频base64缩短
+    silent.play().catch(()=>{}).finally(()=>{ iosUnlocked=true; res(); });
+  });
+}
+
+function render(){
+  const grid=document.getElementById('grid'); grid.innerHTML='';
+  data.forEach(g=>{
+    const card=document.createElement('div'); card.className='card';
+    const head=document.createElement('div');
+    const btn=document.createElement('button'); btn.className='ipa-btn'; btn.textContent=g.ipa;
+    btn.onclick=()=> playIPA(g.ipa, btn, g.tip);
+    head.appendChild(btn); card.appendChild(head);
+    g.words.forEach(w=>{
+      const row=document.createElement('div'); row.className='row';
+      const label=document.createElement('div'); label.textContent=w+' /'+g.ipa+'/ '+zhAuto(w);
+      const play=document.createElement('button'); play.className='play-btn'; play.innerHTML='▶ 播放';
+      play.onclick=()=> playWordRow(row,w);
+      row.appendChild(label); row.appendChild(play);
+      card.appendChild(row);
+    });
+    grid.appendChild(card);
+  });
+}
+render();
+
+async function playIPA(ipa, btn, tip){
+  stopAll(); btn.classList.add('playing');
+  await speak(tip); btn.classList.remove('playing');
+}
+
+async function playWordRow(row, word){
+  stopAll(); row.classList.add('playing');
+  await speak(word); await wait(1000); await speak(zhAuto(word)); await wait(1000); await speak(word);
+  row.classList.remove('playing');
+}
+
+document.getElementById('btnAuto').onclick=async()=>{
+  await unlockAudioOnce();
+  stopAll(); abort=false;
+  for(const g of data){ if(abort) break;
+    await speak(g.tip);
+    for(const w of g.words){ if(abort) break;
+      const rows=[...document.querySelectorAll('.row')];
+      const row=rows.find(r=>r.textContent.includes(w)); if(row) row.classList.add('playing');
+      await speak(w); await wait(1000); await speak(zhAuto(w)); await wait(1000); await speak(w);
+      if(row) row.classList.remove('playing');
+    }
+  }
+};
+</script>
+</body>
+</html>
